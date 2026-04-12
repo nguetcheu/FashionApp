@@ -1,3 +1,9 @@
+## Licence
+
+Le projet **FashionApp** est protégé par le droit d'auteur. Tous droits réservés. 
+Le code est publié ici à des fins de consultation uniquement (portfolio). 
+Toute exploitation commerciale ou redistribution est interdite.
+
 # Welcome to your Expo app 👋
 
 This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
