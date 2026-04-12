@@ -27,8 +27,10 @@ export const Colors = {
     background: '#151718',
     tint: '#fff',
     icon: '#9BA1A6',
+    tabBar: '#151718',
     tabIconDefault: '#9BA1A6',
     tabIconSelected: '#fff',
+    card: '#252728',
   },
 };
 
