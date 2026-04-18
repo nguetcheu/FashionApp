@@ -2,14 +2,14 @@ import * as ImagePicker from "expo-image-picker";
 import {
   Briefcase,
   Camera,
-  CloudRain,
   Coffee,
   RotateCcw,
   Sparkles,
   Zap,
 } from "lucide-react-native";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Image,
   ScrollView,
@@ -18,15 +18,43 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { Fonts } from "../../constants/theme";
+import { Colors, Fonts } from "../../constants/theme";
+import { weatherService } from "../../services/weatherService";
 
 export default function RecommendScreen() {
   const [selectedMood, setSelectedMood] = useState("chill");
   const [outfitImage, setOutfitImage] = useState<string | null>(null);
 
-  // Fonction pour gérer la capture de la tenue complète
+  // États pour la météo réelle
+  const [weather, setWeather] = useState<any>(null);
+  const [loadingWeather, setLoadingWeather] = useState(true);
+
+  // 1. GESTION DE LA DATE DYNAMIQUE
+  const today = new Date();
+  const formattedDate = today.toLocaleDateString("fr-FR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
+
+  // 2. APPEL AU SERVICE MÉTEO
+  useEffect(() => {
+    const loadWeather = async () => {
+      try {
+        setLoadingWeather(true);
+        const data = await weatherService.getWeather();
+        setWeather(data);
+      } catch (error) {
+        console.error("Erreur météo Recommend:", error);
+      } finally {
+        setLoadingWeather(false);
+      }
+    };
+
+    loadWeather();
+  }, []);
+
   const takePhoto = async () => {
-    // Demande de permission pour la caméra
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
 
     if (status !== "granted") {
@@ -37,7 +65,6 @@ export default function RecommendScreen() {
       return;
     }
 
-    // Lancement de l'appareil photo
     const result = await ImagePicker.launchCameraAsync({
       allowsEditing: true,
       aspect: [3, 4],
@@ -54,19 +81,38 @@ export default function RecommendScreen() {
       {/* HEADER SECTION */}
       <View style={styles.header}>
         <Text style={styles.title}>IA Style</Text>
-        <Text style={styles.date}>Dimanche 12 Avril</Text>
+        <Text style={styles.date}>
+          {formattedDate.charAt(0).toUpperCase() + formattedDate.slice(1)}
+        </Text>
       </View>
 
-      {/* WEATHER CARD */}
+      {/* WEATHER CARD RÉELLE */}
       <View style={styles.weatherCard}>
-        <View style={styles.weatherInfo}>
-          <Text style={styles.weatherLabel}>MÉTÉO</Text>
-          <Text style={styles.tempRange}>-3° à +8°</Text>
-          <Text style={styles.precipitation}>Précipitations : 90%</Text>
-        </View>
-        <View style={styles.weatherIconPlaceholder}>
-          <CloudRain size={40} color="#1A2340" strokeWidth={1.5} />
-        </View>
+        {loadingWeather ? (
+          <View style={styles.centerLoader}>
+            <ActivityIndicator color={Colors.light.text} />
+          </View>
+        ) : weather ? (
+          <>
+            <View style={styles.weatherInfo}>
+              <Text style={styles.weatherLabel}>
+                MÉTÉO • {weather.city?.toUpperCase()}
+              </Text>
+              <Text style={styles.tempRange}>{Math.round(weather.temp)}°C</Text>
+              <Text style={styles.precipitation}>
+                {weather.description?.charAt(0).toUpperCase() +
+                  weather.description?.slice(1)}
+              </Text>
+            </View>
+            <View style={styles.weatherIconPlaceholder}>
+              <Text style={{ fontSize: 40 }}>
+                {weatherService.getWeatherEmoji(weather.condition)}
+              </Text>
+            </View>
+          </>
+        ) : (
+          <Text style={styles.precipitation}>Météo non disponible</Text>
+        )}
       </View>
 
       {/* MOOD SELECTOR */}
@@ -78,7 +124,7 @@ export default function RecommendScreen() {
         >
           <Briefcase
             size={22}
-            color={selectedMood === "pro" ? "white" : "#1A2340"}
+            color={selectedMood === "pro" ? "white" : Colors.light.text}
           />
           <Text
             style={[
@@ -99,7 +145,7 @@ export default function RecommendScreen() {
         >
           <Coffee
             size={22}
-            color={selectedMood === "chill" ? "white" : "#1A2340"}
+            color={selectedMood === "chill" ? "white" : Colors.light.text}
           />
           <Text
             style={[
@@ -120,7 +166,7 @@ export default function RecommendScreen() {
         >
           <Zap
             size={22}
-            color={selectedMood === "bold" ? "white" : "#1A2340"}
+            color={selectedMood === "bold" ? "white" : Colors.light.text}
           />
           <Text
             style={[
@@ -133,7 +179,7 @@ export default function RecommendScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* SCAN AREA : DYNAMIQUE */}
+      {/* SCAN AREA */}
       <View style={styles.actionContainer}>
         {outfitImage ? (
           <View style={styles.previewWrapper}>
@@ -156,19 +202,16 @@ export default function RecommendScreen() {
         )}
       </View>
 
-      {/* ANALYZE BUTTON (Visible uniquement si une photo est présente) */}
+      {/* ANALYZE BUTTON */}
       {outfitImage && (
         <TouchableOpacity
           style={styles.analyzeButton}
           onPress={() =>
-            Alert.alert(
-              "Analyse IA",
-              "Comparaison de la tenue avec la météo et l'humeur...",
-            )
+            Alert.alert("Analyse IA", "Comparaison de la tenue en cours...")
           }
         >
           <Sparkles color="white" size={22} />
-          <Text style={styles.analyzeButtonText}>Lancer lanalyse IA</Text>
+          <Text style={styles.analyzeButtonText}>{`Lancer l'analyse IA`}</Text>
         </TouchableOpacity>
       )}
     </ScrollView>
@@ -176,70 +219,55 @@ export default function RecommendScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F8F9FB",
-  },
-  content: {
-    padding: 24,
-    paddingTop: 60,
-  },
-  header: {
-    marginBottom: 30,
-  },
+  container: { flex: 1, backgroundColor: Colors.light.background },
+  content: { padding: 24, paddingTop: 60 },
+  header: { marginBottom: 30 },
   title: {
     fontSize: 28,
     fontFamily: Fonts.serif,
-    color: "#1A2340",
+    color: Colors.light.text,
     fontWeight: "bold",
   },
-  date: {
-    fontSize: 16,
-    color: "#9DA3B0",
-    marginTop: 4,
-  },
+  date: { fontSize: 16, color: Colors.light.icon, marginTop: 4 },
   weatherCard: {
-    backgroundColor: "white",
+    backgroundColor: Colors.light.card,
     borderRadius: 24,
     padding: 24,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 32,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 12,
     elevation: 2,
+    minHeight: 120,
   },
-  weatherInfo: {
-    flex: 1,
-  },
+  centerLoader: { flex: 1, justifyContent: "center", alignItems: "center" },
+  weatherInfo: { flex: 1 },
   weatherLabel: {
     fontSize: 12,
-    color: "#B0BEC5",
+    color: Colors.light.icon,
     fontWeight: "bold",
     letterSpacing: 1,
   },
   tempRange: {
-    fontSize: 26,
+    fontSize: 32,
     fontWeight: "bold",
-    color: "#1A2340",
+    color: Colors.light.text,
     marginVertical: 4,
   },
-  precipitation: {
-    fontSize: 14,
-    color: "#78909C",
-  },
+  precipitation: { fontSize: 14, color: Colors.light.text, opacity: 0.7 },
   weatherIconPlaceholder: {
-    backgroundColor: "#F5F7F9",
+    backgroundColor: Colors.light.background,
     padding: 12,
-    borderRadius: 16,
+    borderRadius: 40,
+    width: 80,
+    height: 80,
+    justifyContent: "center",
+    alignItems: "center",
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#1A2340",
+    color: Colors.light.text,
     marginBottom: 16,
   },
   moodContainer: {
@@ -249,7 +277,7 @@ const styles = StyleSheet.create({
   },
   moodItem: {
     width: "30%",
-    backgroundColor: "white",
+    backgroundColor: Colors.light.card,
     padding: 16,
     borderRadius: 20,
     alignItems: "center",
@@ -257,27 +285,22 @@ const styles = StyleSheet.create({
     borderColor: "#ECEFF1",
   },
   moodActive: {
-    backgroundColor: "#1A2340",
-    borderColor: "#1A2340",
+    backgroundColor: Colors.light.text,
+    borderColor: Colors.light.text,
   },
   moodText: {
     marginTop: 8,
     fontSize: 12,
-    color: "#1A2340",
+    color: Colors.light.text,
     fontWeight: "500",
   },
-  textActive: {
-    color: "white",
-  },
-  actionContainer: {
-    alignItems: "center",
-    marginBottom: 20,
-  },
+  textActive: { color: "white" },
+  actionContainer: { alignItems: "center", marginBottom: 20 },
   scanAction: {
     alignItems: "center",
     width: "100%",
     padding: 40,
-    backgroundColor: "white",
+    backgroundColor: Colors.light.card,
     borderRadius: 24,
     borderStyle: "dashed",
     borderWidth: 2,
@@ -287,29 +310,19 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: "#1A2340",
+    backgroundColor: Colors.light.text,
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 12,
   },
-  scanText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#1A2340",
-  },
+  scanText: { fontSize: 16, fontWeight: "600", color: Colors.light.text },
   previewWrapper: {
     width: "100%",
     height: 400,
     borderRadius: 24,
     overflow: "hidden",
-    position: "relative",
-    backgroundColor: "#E0E0E0",
   },
-  previewImage: {
-    width: "100%",
-    height: "100%",
-    resizeMode: "cover",
-  },
+  previewImage: { width: "100%", height: "100%", resizeMode: "cover" },
   retakeButton: {
     position: "absolute",
     bottom: 20,
@@ -321,16 +334,8 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     alignItems: "center",
     gap: 8,
-    shadowColor: "#000",
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    elevation: 5,
   },
-  retakeText: {
-    color: "white",
-    fontSize: 13,
-    fontWeight: "bold",
-  },
+  retakeText: { color: "white", fontSize: 13, fontWeight: "bold" },
   analyzeButton: {
     backgroundColor: "#2ecc71",
     flexDirection: "row",
@@ -340,14 +345,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 12,
     marginBottom: 50,
-    shadowColor: "#2ecc71",
-    shadowOpacity: 0.2,
-    shadowRadius: 10,
-    elevation: 4,
   },
-  analyzeButtonText: {
-    color: "white",
-    fontWeight: "bold",
-    fontSize: 18,
-  },
+  analyzeButtonText: { color: "white", fontWeight: "bold", fontSize: 18 },
 });

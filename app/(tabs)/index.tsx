@@ -1,4 +1,3 @@
-import * as Location from "expo-location";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -9,7 +8,7 @@ import {
   View,
 } from "react-native";
 import { Colors, Fonts } from "../../constants/theme";
-import api from "../../services/api";
+import { weatherService } from "../../services/weatherService";
 
 export default function HomeScreen() {
   const [weather, setWeather] = useState<any>(null);
@@ -23,34 +22,20 @@ export default function HomeScreen() {
     month: "long",
   });
 
-  // 2. APPEL À TON ENDPOINT MÉTÉO
-  const fetchWeather = async () => {
-    try {
-      setLoading(true);
-
-      // Récupération de la position pour avoir la ville réelle
-      let { status } = await Location.requestForegroundPermissionsAsync();
-      let city = "Paris"; // Par défaut
-
-      if (status === "granted") {
-        const location = await Location.getCurrentPositionAsync({});
-        const reverseGeocode = await Location.reverseGeocodeAsync(
-          location.coords,
-        );
-        city = reverseGeocode[0]?.city || "Paris";
-      }
-
-      // Appel de ta nouvelle route dédiée
-      const response = await api.get(`/recommend/weather?city=${city}`);
-      setWeather(response.data);
-    } catch (error) {
-      console.error("Erreur météo:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // 2. RÉCUPÉRATION DE LA MÉTÉO VIA LE SERVICE
   useEffect(() => {
+    const fetchWeather = async () => {
+      try {
+        setLoading(true);
+        const data = await weatherService.getWeather();
+        setWeather(data);
+      } catch (error) {
+        console.error("Erreur météo Home:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     fetchWeather();
   }, []);
 
@@ -72,7 +57,9 @@ export default function HomeScreen() {
           ) : weather ? (
             <>
               <View style={styles.weatherLeft}>
-                <Text style={styles.weatherLabel}>MÉTÉO • {weather.city}</Text>
+                <Text style={styles.weatherLabel}>
+                  MÉTÉO • {weather.city?.toUpperCase()}
+                </Text>
                 <Text style={styles.temperature}>
                   {Math.round(weather.temp)}°C
                 </Text>
@@ -85,7 +72,7 @@ export default function HomeScreen() {
               <View style={styles.weatherRight}>
                 <View style={styles.placeholderImage}>
                   <Text style={{ fontSize: 40 }}>
-                    {getWeatherEmoji(weather.condition)}
+                    {weatherService.getWeatherEmoji(weather.condition)}
                   </Text>
                 </View>
               </View>
@@ -98,15 +85,6 @@ export default function HomeScreen() {
     </SafeAreaView>
   );
 }
-
-// Utilitaire pour l'icône
-const getWeatherEmoji = (condition: string) => {
-  const c = condition?.toLowerCase();
-  if (c?.includes("cloud")) return "☁️";
-  if (c?.includes("rain")) return "🌧️";
-  if (c?.includes("clear")) return "☀️";
-  return "⛅";
-};
 
 const styles = StyleSheet.create({
   container: {
