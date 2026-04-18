@@ -47,8 +47,21 @@ export const authService = {
     }
   },
 
+  getUserProfile: async () => {
+    try {
+      const response = await api.get("/auth/me");
+      return response.data; // Contient { user, stats }
+    } catch (error: any) {
+      throw error.response?.data?.message || "Erreur profil";
+    }
+  },
+
   // Déconnexion
   logout: async () => {
-    await SecureStore.deleteItemAsync("userToken");
+    try {
+      await SecureStore.deleteItemAsync("userToken");
+    } catch (error) {
+      console.error("Erreur lors de la déconnexion", error);
+    }
   },
 };

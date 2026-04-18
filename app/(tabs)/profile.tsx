@@ -1,6 +1,9 @@
-import { Edit3, Grid, Heart, Settings } from "lucide-react-native";
-import React, { useState } from "react";
+import { useRouter } from "expo-router";
+import { Edit3, Grid, LogOut, Settings } from "lucide-react-native";
+import React, { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
   Dimensions,
   FlatList,
   Image,
@@ -9,34 +12,55 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { Fonts } from "../../constants/theme";
+import { Colors, Fonts } from "../../constants/theme";
+import { authService } from "../../services/authService";
 
 const { width } = Dimensions.get("window");
-const COLUMN_WIDTH = width / 3; // Grille de 3 colonnes pour le profil (style Instagram)
+const COLUMN_WIDTH = width / 3;
 
 export default function ProfileScreen() {
-  const [activeTab, setActiveTab] = useState("tenues");
+  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState<any>(null);
 
-  // Données de test (Mocks) pour simuler le rendu visuel
-  const dummyOutfits = [
-    {
-      id: "1",
-      img: "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=500",
-    },
-    {
-      id: "2",
-      img: "https://images.unsplash.com/photo-1539109132314-d4a8c6138d83?w=500",
-    },
-    {
-      id: "3",
-      img: "https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=500",
-    },
-  ];
+  useEffect(() => {
+    loadProfile();
+  }, []);
+
+  const loadProfile = async () => {
+    try {
+      // On ne montre le loader global que si on n'a pas encore de données
+      if (!profile) setLoading(true);
+      const data = await authService.getUserProfile();
+      setProfile(data);
+    } catch (error) {
+      console.error("Erreur profil:", error);
+      Alert.alert("Erreur", "Impossible de charger votre profil.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    Alert.alert("Déconnexion", "Voulez-vous vous déconnecter ?", [
+      { text: "Annuler", style: "cancel" },
+      {
+        text: "Oui",
+        onPress: async () => {
+          await authService.logout();
+          router.replace("/login");
+        },
+      },
+    ]);
+  };
 
   return (
     <View style={styles.container}>
-      {/* Header avec icônes d'action */}
+      {/* Header */}
       <View style={styles.header}>
+        <TouchableOpacity style={styles.iconCircle} onPress={handleLogout}>
+          <LogOut color="#1A2340" size={20} />
+        </TouchableOpacity>
         <TouchableOpacity style={styles.iconCircle}>
           <Settings color="#1A2340" size={20} />
         </TouchableOpacity>
@@ -46,87 +70,72 @@ export default function ProfileScreen() {
       <View style={styles.profileInfo}>
         <View style={styles.imageContainer}>
           <View style={styles.imagePlaceholder}>
-            <Text style={styles.avatarText}>NKD</Text>
+            {/* Si ça charge et qu'on n'a pas de profil, on met un petit spinner dans le cercle */}
+            {loading && !profile ? (
+              <ActivityIndicator size="small" color="#1A2340" />
+            ) : (
+              <Text style={styles.avatarText}>
+                {profile?.user?.username?.charAt(0).toUpperCase() || "U"}
+              </Text>
+            )}
           </View>
           <TouchableOpacity style={styles.editBadge}>
             <Edit3 color="white" size={14} />
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.userName}>Nguetcheu Dominique</Text>
-        <Text style={styles.userHandle}>@bika_style</Text>
+        <Text style={styles.userName}>
+          {profile?.user?.username ||
+            (loading ? "Chargement..." : "Utilisateur")}
+        </Text>
+        <Text style={styles.userHandle}>{profile?.user?.email || " "}</Text>
 
         <View style={styles.statsRow}>
           <View style={styles.statBox}>
-            <Text style={styles.statNumber}>24</Text>
+            <Text style={styles.statNumber}>
+              {profile?.stats?.itemsCount ?? 0}
+            </Text>
             <Text style={styles.statLabel}>Items</Text>
           </View>
           <View style={styles.divider} />
           <View style={styles.statBox}>
-            <Text style={styles.statNumber}>12</Text>
+            <Text style={styles.statNumber}>
+              {profile?.stats?.outfitsCount ?? 0}
+            </Text>
             <Text style={styles.statLabel}>Tenues</Text>
-          </View>
-          <View style={styles.divider} />
-          <View style={styles.statBox}>
-            <Text style={styles.statNumber}>102</Text>
-            <Text style={styles.statLabel}>Abonnés</Text>
           </View>
         </View>
       </View>
 
-      {/* Navigation Interne (Tabs) */}
-      <View style={styles.tabSection}>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === "tenues" && styles.tabActive]}
-          onPress={() => setActiveTab("tenues")}
-        >
-          <Grid
-            color={activeTab === "tenues" ? "#1A2340" : "#9DA3B0"}
-            size={20}
-          />
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === "tenues" && styles.tabTextActive,
-            ]}
-          >
-            Mes Tenues
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.tab, activeTab === "favoris" && styles.tabActive]}
-          onPress={() => setActiveTab("favoris")}
-        >
-          <Heart
-            color={activeTab === "favoris" ? "#1A2340" : "#9DA3B0"}
-            size={20}
-          />
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === "favoris" && styles.tabTextActive,
-            ]}
-          >
-            Favoris
-          </Text>
-        </TouchableOpacity>
+      <View style={styles.sectionHeader}>
+        <Grid color="#1A2340" size={20} />
+        <Text style={styles.sectionTitle}>Mes Tenues</Text>
       </View>
 
-      {/* Grille de contenu */}
       <FlatList
-        data={activeTab === "tenues" ? dummyOutfits : []}
+        data={profile?.outfits || []}
         numColumns={3}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item._id || item.id}
         contentContainerStyle={styles.gridContent}
         renderItem={({ item }) => (
           <TouchableOpacity style={styles.gridItem}>
-            <Image source={{ uri: item.img }} style={styles.gridImage} />
+            <Image
+              source={{
+                uri: item.imageUrl || "https://via.placeholder.com/150",
+              }}
+              style={styles.gridImage}
+            />
           </TouchableOpacity>
         )}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>Aucun contenu à afficher</Text>
+            {loading ? (
+              <ActivityIndicator color="#1A2340" />
+            ) : (
+              <Text style={styles.emptyText}>
+                {`Vous n'avez pas encore créé de tenues.`}
+              </Text>
+            )}
           </View>
         }
       />
@@ -135,32 +144,33 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F8F9FB", paddingTop: 50 },
+  container: {
+    flex: 1,
+    backgroundColor: Colors.light.background,
+    paddingTop: 50,
+  },
+  center: { flex: 1, justifyContent: "center", alignItems: "center" },
   header: {
     flexDirection: "row",
-    justifyContent: "flex-end",
+    justifyContent: "space-between",
     paddingHorizontal: 20,
   },
   iconCircle: {
     width: 40,
     height: 40,
-    backgroundColor: "white",
+    backgroundColor: Colors.light.card,
     borderRadius: 20,
     justifyContent: "center",
     alignItems: "center",
     elevation: 2,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
   },
-
   profileInfo: { alignItems: "center", marginTop: 10 },
   imageContainer: { position: "relative" },
   imagePlaceholder: {
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: "#F2EEE9",
+    backgroundColor: Colors.light.background,
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 4,
@@ -188,45 +198,31 @@ const styles = StyleSheet.create({
     marginTop: 15,
   },
   userHandle: { color: "#9DA3B0", fontSize: 14, marginBottom: 20 },
-
   statsRow: {
     flexDirection: "row",
-    width: "85%",
+    width: "70%",
     justifyContent: "space-around",
     paddingVertical: 15,
     backgroundColor: "white",
     borderRadius: 20,
     elevation: 2,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
   },
-  statBox: { alignItems: "center" },
+  statBox: { flex: 1, alignItems: "center" },
   statNumber: { fontSize: 18, fontWeight: "bold", color: "#1A2340" },
   statLabel: { fontSize: 12, color: "#9DA3B0" },
   divider: { width: 1, height: "100%", backgroundColor: "#ECEFF1" },
-
-  tabSection: {
+  sectionHeader: {
     flexDirection: "row",
-    marginTop: 30,
-    borderBottomWidth: 1,
-    borderBottomColor: "#ECEFF1",
-  },
-  tab: {
-    flex: 1,
     alignItems: "center",
-    paddingVertical: 15,
-    flexDirection: "row",
-    justifyContent: "center",
     gap: 8,
+    paddingHorizontal: 20,
+    marginTop: 30,
+    marginBottom: 15,
   },
-  tabActive: { borderBottomWidth: 2, borderBottomColor: "#1A2340" },
-  tabText: { color: "#9DA3B0", fontWeight: "600" },
-  tabTextActive: { color: "#1A2340", fontWeight: "bold" },
-
+  sectionTitle: { fontSize: 18, fontWeight: "bold", color: "#1A2340" },
   gridContent: { paddingBottom: 20 },
   gridItem: { width: COLUMN_WIDTH, height: COLUMN_WIDTH, padding: 1 },
   gridImage: { width: "100%", height: "100%", resizeMode: "cover" },
   emptyContainer: { padding: 40, alignItems: "center" },
-  emptyText: { color: "#9DA3B0" },
+  emptyText: { color: "#9DA3B0", textAlign: "center" },
 });
